@@ -116,17 +116,40 @@ size_t initialiserTaille(animal animaux[], size_t taille){
     return taille;
 }
 
+void trim(char chaine[]){
+    size_t d=0, f=strlen(chaine);
+
+    while(chaine[d]==' '){
+        d++;
+    }
+    if(d==f)
+        chaine = "";
+    else{
+        while(chaine[f-1]==' '){
+            f--;
+        }
+        char morceau[f-d];
+
+        strncpy(morceau, chaine+d, f-d);
+        morceau[f-d]='\0';
+        strcpy(chaine, morceau);
+    }
+}
+
 size_t chaineValide(char chaine[]){
-    size_t j=0, taille=strlen(chaine);
+    size_t j=0, cmp_espace=0, taille=strlen(chaine);
 
     if(taille<longueurChaineMax && taille>0){
+        trim(chaine);
         while(chaine[j]!='\0'){
             if((chaine[j]<'a' || chaine[j]>'z') && (chaine[j]<'A' || chaine[j]>'Z') && chaine[j] != ' ')
                 return 0;
+            if(chaine[j]==' ')
+                cmp_espace++;
             j++;
         }
     
-        return 1;
+        return (cmp_espace<taille) ? 1:0;
     }
 
     return 0;
@@ -199,7 +222,7 @@ size_t saisirAge(){
 }
 
 float saisirPoids(){
-    float poids = 0;
+    float poids;
     size_t validation;
 
     do{
@@ -209,26 +232,44 @@ float saisirPoids(){
             validation = 0;
             while(getchar()!='\n');
         }
-    }while(!validation);
+    }while(poids<0 || !validation);
 
     return poids;
 }
 
-void ajouterAnimal(animal animaux[], size_t nbrAnimaux){
+size_t reponseValide(char rep[]){
+    trim(rep);
+    if(stricmp(rep, "O")==0 || stricmp(rep, "N")==0)
+        return 1;
     
+    return 0;
+}
+
+size_t ajouterAnimal(animal animaux[], size_t nbrAnimaux){
+    char reponse[2];
+
     if(nbrAnimaux<=nbrMaxAnimaux){
-        animaux[nbrAnimaux].id = nbrAnimaux;
+        animaux[nbrAnimaux].id = nbrAnimaux+1;
         saisirNom(animaux[nbrAnimaux].nom);
         saisirEspece(animaux[nbrAnimaux].espece);
         animaux[nbrAnimaux].age = saisirAge();
         saisirHabitat(animaux[nbrAnimaux].habitat);
-        animaux[nbrAnimaux].poids = saisirPoids();
+        do{
+            printf("Voulez-vous entrer le poids? [O/N]\n");
+            gets(reponse);
+        }while(!reponseValide(reponse));
+        if(stricmp(reponse, "O")==0)
+            animaux[nbrAnimaux].poids = saisirPoids();
+        else
+            animaux[nbrAnimaux].poids = -1;
         nbrAnimaux++;
         printf("Animal ajoute avec succes.\n");
     }
     else{
         printf("Pas de place pour ajouter un autre.\n");
     }
+
+    return nbrAnimaux;
 }
 
 size_t nombreValide(char nombre[]){
@@ -247,7 +288,7 @@ size_t nombreValide(char nombre[]){
     return 0;
 }
 
-void ajouterAnimaux(animal animaux[], size_t nbrAnimaux){
+size_t ajouterAnimaux(animal animaux[], size_t nbrAnimaux){
     char nombre[longueurChaineMax];
 
     do{
@@ -260,19 +301,20 @@ void ajouterAnimaux(animal animaux[], size_t nbrAnimaux){
 
     if(nbr){
         for(i=0;i<nbr;i++){
-            ajouterAnimal(animaux, nbrAnimaux);
+            nbrAnimaux = ajouterAnimal(animaux, nbrAnimaux);
         }
     }
     else{
         printf("Rien a ajoute.\n");
     }
 
+    return nbrAnimaux;
 }
 
 void afficherAnimal(animal a){
     if(a.id){
         printf("***Animal:%zu***\n\tNom:%s\n\tEspece:%s\n\tAge:%zu\n\tHabitat:%s\n", a.id, a.nom, a.espece, a.age, a.habitat);
-        if(a.poids)
+        if(a.poids!=-1)
             printf("\tPoids:%.1f\n\n", a.poids);
         else
             printf("\tPoids:non specifie\n\n");
@@ -290,7 +332,20 @@ void afficherAnimaux(animal animaux[], size_t nbrAnimaux){
 }
 
 void trierAnimauxParNom(animal animaux[], size_t nbrAnimaux){
+    size_t i, j, indice_min;
+    animal temp;
 
+    for(i=0;i<nbrAnimaux;i++){
+        indice_min = i;
+        for(j=i+1;j<nbrAnimaux;j++){
+            if(strcmp(animaux[indice_min].nom, animaux[j].nom)>0){
+                indice_min = j;
+            }
+        }
+        temp = animaux[indice_min];
+        animaux[indice_min]=animaux[i];
+        animaux[i]=temp;
+    }
 }
 
 void afficherAnimauxParNom(animal animaux[], size_t nbrAnimaux){
@@ -299,7 +354,22 @@ void afficherAnimauxParNom(animal animaux[], size_t nbrAnimaux){
 }
 
 void trierAnimauxParAge(animal animaux[], size_t nbrAnimaux){
+    size_t i, j, min, indice_min;
+    animal temp;
 
+    for(i=0;i<nbrAnimaux;i++){
+        min = animaux[i].age;
+        indice_min = i;
+        for(j=i+1;j<nbrAnimaux;j++){
+            if(min>animaux[j].age){
+                min = animaux[j].age;
+                indice_min = j;
+            }
+        }
+        temp = animaux[indice_min];
+        animaux[indice_min]=animaux[i];
+        animaux[i]=temp;
+    }
 }
 
 void afficherAnimauxParAge(animal animaux[], size_t nbrAnimaux){
@@ -327,8 +397,12 @@ animal rechercherAnimalParId(animal animaux[], size_t nbrAnimaux, size_t id){
     animal a;
 
     a.id = 0;
-    if(id<=nbrAnimaux)
-        return animaux[id-1];
+    if(id<=nbrAnimaux){
+        for(i=0;i<nbrAnimaux;i++){
+            if(animaux[i].id==id)
+                return animaux[i];
+        }
+    }
     return a;
 }
 
@@ -336,33 +410,55 @@ size_t saisirId(){
     char nombre[longueurChaineMax];
 
     do{
-        printf("\nEntrez l'id de l'animal a modifier: ");
+        printf("\nEntrez l'id de l'animal: ");
         gets(nombre);
     }while(!nombreValide(nombre));
 
     return atoi(nombre);
 }
+
+void trierAnimauxParId(animal animaux[], size_t nbrAnimaux){
+    size_t i, j, indice_min;
+    animal temp;
+
+    for(i=0;i<nbrAnimaux;i++){
+        indice_min = i;
+        for(j=i+1;j<nbrAnimaux;j++){
+            if(animaux[indice_min].id>animaux[j].id){
+                indice_min = j;
+            }
+        }
+        temp = animaux[indice_min];
+        animaux[indice_min]=animaux[i];
+        animaux[i]=temp;
+    }
+}
+
 animal modifierHabitat(animal animaux[], size_t nbrAnimaux){
     size_t nbr=saisirId();
 
+    trierAnimauxParId(animaux, nbrAnimaux);
     animal a = rechercherAnimalParId(animaux, nbrAnimaux, nbr);
     if(a.id){
-        saisirHabitat(animaux[a.id].habitat);
+        a=animaux[a.id-1];
+        saisirHabitat(animaux[a.id-1].habitat);
         printf("\nAnimal apres modification: \n");
     }
-    afficherAnimal(a);
+    afficherAnimal(animaux[a.id-1]);
     return a;
 }
 
 animal modifierAge(animal animaux[], size_t nbrAnimaux){
     size_t nbr=saisirId();
 
+    trierAnimauxParId(animaux, nbrAnimaux);
     animal a = rechercherAnimalParId(animaux, nbrAnimaux, nbr);
     if(a.id){
-        saisirAge(animaux[a.id].age);
+        a=animaux[a.id-1];
+        animaux[a.id-1].age=saisirAge();
         printf("Animal apres modification: \n");
     }
-    afficherAnimal(a);
+    afficherAnimal(animaux[a.id-1]);
     return a;
 }
 
@@ -370,13 +466,14 @@ size_t supprimerAnimal(animal animaux[], size_t nbrAnimaux){
     size_t i, nbr=saisirId();
     animal temp = rechercherAnimalParId(animaux, nbrAnimaux, nbr);
 
+    trierAnimauxParId(animaux, nbrAnimaux);
     if(temp.id){
         for(i=nbr-1;i<nbrAnimaux;i++){
-            animaux[i+1].id = animaux[i].id;
             animaux[i]=animaux[i+1];
+            animaux[i].id--;
         }
-        temp.id = animaux[i].id;
         animaux[i]=temp;
+        animaux[i].id--;
         nbrAnimaux--;
     }
 
@@ -410,7 +507,96 @@ size_t rechercherAnimalParEspece(animal animaux[], size_t nbrAnimaux, animal ani
 }
 
 float ageMoyenAnimaux(animal animaux[], size_t nbrAnimaux){
+    size_t i, somme=0;
 
+    for(i=0;i<nbrAnimaux;i++){
+        somme += animaux[i].age;
+    }
+
+    return (float)somme/(float)nbrAnimaux;
+}
+
+void plusJeuneAnimal(animal animaux[], size_t nbrAnimaux){
+    size_t i, min=animaux[0].age;
+
+    for(i=1;i<nbrAnimaux;i++){
+        if(min>animaux[i].age){
+            min = animaux[i].age;
+        }
+    }
+
+    for(i=0;i<nbrAnimaux;i++){
+        if(min == animaux[i].age)
+            afficherAnimal(animaux[i]);
+    }
+}
+
+void plusVieuxAnimal(animal animaux[], size_t nbrAnimaux){
+    size_t i, max=animaux[0].age;
+
+    for(i=1;i<nbrAnimaux;i++){
+        if(max<animaux[i].age){
+            max = animaux[i].age;
+        }
+    }
+
+    for(i=0;i<nbrAnimaux;i++){
+        if(max == animaux[i].age)
+            afficherAnimal(animaux[i]);
+    }
+}
+
+void trierAnimauxParEspece(animal animaux[], size_t nbrAnimaux){
+    size_t i, j, indice_min;
+    animal temp;
+
+    for(i=0;i<nbrAnimaux;i++){
+        indice_min = i;
+        for(j=i+1;j<nbrAnimaux;j++){
+            if(strcmp(animaux[indice_min].espece, animaux[j].espece)>0){
+                indice_min = j;
+            }
+        }
+        temp = animaux[indice_min];
+        animaux[indice_min]=animaux[i];
+        animaux[i]=temp;
+    }
+}
+
+void especesLesPlusRepresentees(animal animaux[], size_t nbrAnimaux){
+    size_t count=0, max=0, nbr=0;
+    char especeActuelle[longueurChaineMax];
+
+    trierAnimauxParEspece(animaux, nbrAnimaux);
+    strcpy(especeActuelle, animaux[0].espece);
+    while (nbr<nbrAnimaux){
+        if(strcmp(especeActuelle, animaux[nbr].espece)==0){
+            count++;
+        }
+        else{
+            max = (count>max)?count:max;
+            count = 0;
+            strcpy(especeActuelle, animaux[nbr].espece);
+        }
+        nbr++;
+    }
+    max = (count>max)?count:max;
+    count = 0;
+    nbr=0;
+    while (nbr<nbrAnimaux){
+        if(strcmp(especeActuelle, animaux[nbr].espece)==0){
+            count++;
+        }
+        else{
+            if(count==max)
+                printf("***%s***\n", especeActuelle);
+            count = 0;
+            strcpy(especeActuelle, animaux[nbr].espece);
+        }
+        nbr++;
+    }
+    if(count==max)
+        printf("***%s***\n", especeActuelle);
 }
 
 void main(){
@@ -451,16 +637,16 @@ void main(){
                     switch(subChoix){
                         case 1: 
                             printf("===Ajouter un animal===\n");
-                            ajouterAnimal(animaux, nbrAnimaux);
+                            nbrAnimaux = ajouterAnimal(animaux, nbrAnimaux);
                             break;
                         case 2: 
                             printf("===Ajouter plusieurs animaux===\n");
-                            ajouterAnimaux(animaux, nbrAnimaux);
+                            nbrAnimaux = ajouterAnimaux(animaux, nbrAnimaux);
                             break;
                         case 3: 
                             break;
                         default:
-                            printf("Veuillez entrer un nombre valide.");
+                            printf("Veuillez entrer un choix valide.");
                     }
                 }while(subChoix!=3);
                 break;
@@ -487,7 +673,7 @@ void main(){
                         case 5: 
                             break;
                         default:
-                            printf("Veuillez entrer un nombre valide.");
+                            printf("Veuillez entrer un choix valide.");
                     }
                 }while(subChoix!=5);
                 break;
@@ -506,12 +692,12 @@ void main(){
                         case 3: 
                             break;
                         default:
-                            printf("Veuillez entrer un nombre valide.");
+                            printf("Veuillez entrer un choix valide.");
                     }
                 }while(subChoix!=3);
                 break;
             case 4: 
-                printf("===Supprimer un animal===");
+                printf("===Supprimer un animal===\n");
                 nbrAnimaux = supprimerAnimal(animaux, nbrAnimaux);
                 break;
             case 5: 
@@ -519,17 +705,17 @@ void main(){
                     subChoix = subMenuRecherche();
                     switch(subChoix){
                         case 1: 
-                            printf("===Rechercher un animal par id===");
+                            printf("===Rechercher un animal par id===\n");
                             afficherAnimal(rechercherAnimalParId(animaux, nbrAnimaux,saisirId()));
                             break;
                         case 2: 
-                            printf("===Rechercher un animal par nom===");
+                            printf("===Rechercher un animal par nom===\n");
                             saisirNom(chaine);
                             nbrAnimauxTrouves = rechercherAnimalParNom(animaux, nbrAnimaux, animauxTrouves, chaine);
                             afficherAnimaux(animauxTrouves, nbrAnimauxTrouves);
                             break;
                         case 3:
-                            printf("===Rechercher un animal par espece===");
+                            printf("===Rechercher un animal par espece===\n");
                             saisirEspece(chaine);
                             nbrAnimauxTrouves = rechercherAnimalParEspece(animaux, nbrAnimaux, animauxTrouves, chaine);
                             afficherAnimaux(animauxTrouves, nbrAnimauxTrouves);
@@ -537,7 +723,7 @@ void main(){
                         case 4: 
                             break;
                         default:
-                            printf("Veuillez entrer un nombre valide.");
+                            printf("Veuillez entrer un choix valide.");
                     }
                 }while(subChoix!=4);
                 break;
@@ -546,23 +732,28 @@ void main(){
                     subChoix = subMenuStatistiques();
                     switch(subChoix){
                         case 1: 
-                            printf("===Nombre total des animaux dans le zoo===");
+                            printf("===Nombre total des animaux dans le zoo===\n");
                             printf("Le nombre total des animaux dans le zoo est: %d.\n", nbrAnimaux);
                             break;
                         case 2: 
-                            printf("===Age moyen des animaux===");
-
+                            printf("===Age moyen des animaux===\n");
+                            printf("L'age moyen des animaux est: %.2f.\n", ageMoyenAnimaux(animaux, nbrAnimaux));
                             break;
                         case 3:
-                            printf("===Plus vieux et plus jeune animal===");
+                            printf("===Plus vieux et plus jeune animal===\n");
+                            printf("Le plus jeune animal est: \n");
+                            plusJeuneAnimal(animaux, nbrAnimaux);
+                            printf("Le plus vieux animal est: \n");
+                            plusVieuxAnimal(animaux, nbrAnimaux);
                             break;
                         case 4:
-                            printf("===Les especes les plus representees==");
+                            printf("===Les especes les plus representees==\n");
+                            especesLesPlusRepresentees(animaux, nbrAnimaux);
                             break;
                         case 5: 
                             break;
                         default:
-                            printf("Veuillez entrer un nombre valide.");
+                            printf("Veuillez entrer un choix valide.");
                     }
                 }while(subChoix!=5);
                 break;
@@ -570,7 +761,7 @@ void main(){
                 printf("Au revoir!");
                 break;
             default:
-                printf("Veuillez entrer un nombre valide.");
+                printf("Veuillez entrer un choix valide.");
         }
     }while(choix!=7);
 }
